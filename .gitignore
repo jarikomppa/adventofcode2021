@@ -1,0 +1,6 @@
+*.filters
+*.user
+*.gif
+*.csv
+.vs/
+x64/
