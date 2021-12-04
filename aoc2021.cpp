@@ -19,17 +19,17 @@ void setupgif(int motionblurframes, const char* fn)
 }
 
 unsigned int frame[512 * 512];
-void nextframe()
+void nextframe(int ofs)
 {
 	for (int i = 0; i < 512; i++)
 	{
 		for (int j = 0; j < 512; j++)
 		{
 			int c =
-				((framebuffer[(i * 2 + 0) * 1024 + (j * 2 + 0)] & 0xfcfcfcfc) >> 2) +
-				((framebuffer[(i * 2 + 0) * 1024 + (j * 2 + 1)] & 0xfcfcfcfc) >> 2) +
-				((framebuffer[(i * 2 + 1) * 1024 + (j * 2 + 0)] & 0xfcfcfcfc) >> 2) +
-				((framebuffer[(i * 2 + 1) * 1024 + (j * 2 + 1)] & 0xfcfcfcfc) >> 2);
+				((framebuffer[(i * 2 + 0) * 1024 + (ofs + j * 2 + 0) % 1024] & 0xfcfcfcfc) >> 2) +
+				((framebuffer[(i * 2 + 0) * 1024 + (ofs + j * 2 + 1) % 1024] & 0xfcfcfcfc) >> 2) +
+				((framebuffer[(i * 2 + 1) * 1024 + (ofs + j * 2 + 0) % 1024] & 0xfcfcfcfc) >> 2) +
+				((framebuffer[(i * 2 + 1) * 1024 + (ofs + j * 2 + 1) % 1024] & 0xfcfcfcfc) >> 2);
 			framedata[512 * 512 * frameidx + i * 512 + j] = c;
 		}
 	}
@@ -69,9 +69,9 @@ void drawrect(int x0, int y0, int x1, int y1, unsigned int color)
 	if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
 	if (y0 > y1) { int t = y0; y0 = y1; y1 = t; }
 	if (x0 < 0) x0 = 0;
-	if (x1 > 1023) x1 = 1023;
+	if (x1 > 1024) x1 = 1024;
 	if (y0 < 0) y0 = 0;
-	if (y1 > 1023) y1 = 1023;
+	if (y1 > 1024) y1 = 1024;
 	for (int i = y0; i < y1; i++)
 		for (int j = x0; j < x1; j++)
 			framebuffer[i * 1024 + j] = color;
@@ -84,6 +84,7 @@ void drawspan(int x0, int y0, int x1, unsigned int color)
 	if (x0 < 0) x0 = 0;
 	if (x1 > 1023) x1 = 1023;
 	if (y0 < 0) y0 = 0;
+	if (y0 > 1023) y0 = 1023;
 	for (int j = x0; j < x1; j++)
 		framebuffer[y0 * 1024 + j] = color;
 }

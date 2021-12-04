@@ -7,7 +7,7 @@
 extern unsigned int framebuffer[];
 
 void setupgif(int motionblurframes, const char* fn);
-void nextframe();
+void nextframe(int ofs = 0);
 void endgif();
 void clear();
 void drawrect(int x0, int y0, int x1, int y1, unsigned int color);

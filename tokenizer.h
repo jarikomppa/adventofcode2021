@@ -59,6 +59,9 @@ public:
 	// Get a copy of a token
     char * dup(int aIdx);
 
+	// Get as integer
+	int asInt(int aIdx) { return atoi(get(aIdx)); }
+
 	// Check if token equals a string
     int equals(int aIdx, const char *aString);
 

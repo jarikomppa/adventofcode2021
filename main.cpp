@@ -182,7 +182,7 @@ void testparse()
 							avg += tempdata[i].temp;
 					}
 					avg /= maxdata;
-					drawrect(0, 512 - avg, 1024, 512 - avg + 1, 0x80808080);
+					drawrect(0, (int)(512 - avg), 1024, (int)(512 - avg + 1), 0x80808080);
 					nextframe();
 				}
 			}
@@ -190,7 +190,7 @@ void testparse()
 		}
 	}
 	endgif();
-	return 0;
+	return;
 }
 
 int main(int parc, char** pars)
