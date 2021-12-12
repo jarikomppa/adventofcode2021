@@ -15,6 +15,7 @@ void drawbox(int x0, int y0, int w, int h, unsigned int color);
 void drawtri(double x0, double y0, double x1, double y1, double x2, double y2, unsigned int color);
 void drawline(double x0, double y0, double x1, double y1, double w, unsigned int color);
 void drawarrow(double x0, double y0, double x1, double y1, double w, unsigned int color);
+void drawarrow(double start, double end, double x0, double y0, double x1, double y1, double w, unsigned int color);
 void drawcircle(double x0, double y0, double r, unsigned int color);
 void drawstring(const char* aString, int aX, int aY, int aColor);
 void drawstring(const char* aString, int aX, int aY, int n, int aColor);

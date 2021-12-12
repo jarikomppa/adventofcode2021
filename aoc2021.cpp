@@ -205,24 +205,61 @@ void drawarrow(double x0, double y0, double x1, double y1, double w, unsigned in
 	if (nd < 1) return;
 	nx /= nd;
 	ny /= nd;
-	double ux = y1 - y0;
-	double uy = x1 - x0;
+	double uy = y1 - y0;
+	double ux = x1 - x0;
 	double ud = (double)sqrt(ux * ux + uy * uy);
 	ux /= ud;
 	uy /= ud;
-	drawline(x0, y0, x1 + uy * w * 0.5, y1 + ux * w * 0.5, w, color);
+	drawline(x0, y0, x1 + ux * w * 0.5, y1 + uy * w * 0.5, w, color);
 	drawline(
 		x1,
 		y1,
-		x1 + (nx - uy) * w * 4,
-		y1 + (ny - ux) * w * 4,
+		x1 + (nx - ux) * w * 4,
+		y1 + (ny - uy) * w * 4,
 		w,
 		color);
 	drawline(
 		x1,
 		y1,
-		x1 + (-nx - uy) * w * 4,
-		y1 + (-ny - ux) * w * 4,
+		x1 + (-nx - ux) * w * 4,
+		y1 + (-ny - uy) * w * 4,
+		w,
+		color);
+}
+
+void drawarrow(double start, double end, double x0, double y0, double x1, double y1, double w, unsigned int color)
+{
+	double nx = y0 - y1;
+	double ny = x1 - x0;
+	double nd = (double)sqrt(nx * nx + ny * ny);
+	if (nd < 1) return;
+	nx /= nd;
+	ny /= nd;
+
+	double uy = y1 - y0;
+	double ux = x1 - x0;
+	double ud = (double)sqrt(ux * ux + uy * uy);
+	ux /= ud;
+	uy /= ud;
+
+	x0 += ux * start;
+	y0 += uy * start;
+	x1 -= ux * end;
+	y1 -= uy * end;
+	
+	drawline(x0, y0, x1 + ux * w * 0.5, y1 + uy * w * 0.5, w, color);
+	drawline(
+		x1,
+		y1,
+		x1 + (nx - ux) * w * 4,
+		y1 + (ny - uy) * w * 4,
+		w,
+		color);
+	drawline(
+		x1,
+		y1,
+		x1 + (-nx - ux) * w * 4,
+		y1 + (-ny - uy) * w * 4,
 		w,
 		color);
 }
@@ -364,6 +401,7 @@ void drawchar(int aChar, int aX, int aY, int aColor)
 
 void drawstring(const char* aString, int aX, int aY, int aColor)
 {
+	if (aY + 8 > 1024) return;
 	while (*aString)
 	{
 		drawchar(*aString, aX, aY, aColor);
