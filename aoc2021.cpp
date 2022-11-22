@@ -8,6 +8,36 @@ GifWriter gifwriter;
 unsigned int* framedata;
 int frames;
 int frameidx;
+int do_blend = 0;
+
+int blend(int dst, int src)
+{
+	double alpha = ((src >> 24) & 0xff) / 255.0;
+	double r0 = ((dst >> 0) & 0xff) / 255.0;
+	double g0 = ((dst >> 8) & 0xff) / 255.0;
+	double b0 = ((dst >> 16) & 0xff) / 255.0;
+	double r1 = ((src >> 0) & 0xff) / 255.0;
+	double g1 = ((src >> 8) & 0xff) / 255.0;
+	double b1 = ((src >> 16) & 0xff) / 255.0;
+	double r = (r0 * (1 - alpha)) + r1 * alpha;
+	double g = (g0 * (1 - alpha)) + g1 * alpha;
+	double b = (b0 * (1 - alpha)) + b1 * alpha;
+	return ((int)(r * 255) << 0) | ((int)(g * 255) << 8) | ((int)(b * 255) << 16);
+}
+
+void blendwrite(int ofs, int c)
+{
+	if (do_blend)
+		framebuffer[ofs] = blend(framebuffer[ofs], c);
+	else
+		framebuffer[ofs] = framebuffer[ofs] = c;
+}
+
+double scale(double x, double xmin, double xmax, double dmin, double dmax)
+{
+	return ((x - xmin) / (xmax - xmin)) * (dmax - dmin) + dmin;
+}
+
 
 void setupgif(int motionblurframes, const char* fn)
 {
@@ -19,7 +49,7 @@ void setupgif(int motionblurframes, const char* fn)
 }
 
 unsigned int frame[512 * 512];
-void nextframe(int ofs)
+void nextframe(int ofs, int commit)
 {
 	for (int i = 0; i < 512; i++)
 	{
@@ -56,6 +86,7 @@ void nextframe(int ofs)
 			frame[i * 512 + j] = 0xff000000 | (b << 16) | (g << 8) | r;
 		}
 	}
+	if (commit)
 	GifWriteFrame(&gifwriter, (const unsigned char*)frame, 512, 512, 3);
 }
 
@@ -74,7 +105,12 @@ void drawrect(int x0, int y0, int x1, int y1, unsigned int color)
 	if (y1 > 1024) y1 = 1024;
 	for (int i = y0; i < y1; i++)
 		for (int j = x0; j < x1; j++)
-			framebuffer[i * 1024 + j] = color;
+			blendwrite(i * 1024 + j, color);
+}
+
+void drawrect(double x0, double y0, double x1, double y1, unsigned int color)
+{
+	drawrect((int)x0, (int)y0, (int)x1, (int)y1, color);
 }
 
 void drawspan(int x0, int y0, int x1, unsigned int color)
@@ -86,7 +122,7 @@ void drawspan(int x0, int y0, int x1, unsigned int color)
 	if (y0 < 0) y0 = 0;
 	if (y0 > 1023) y0 = 1023;
 	for (int j = x0; j < x1; j++)
-		framebuffer[y0 * 1024 + j] = color;
+		blendwrite(y0 * 1024 + j, color);
 }
 
 
@@ -177,6 +213,11 @@ void drawtri(double x0, double y0, double x1, double y1, double x2, double y2, u
 
 void drawline(double x0, double y0, double x1, double y1, double w, unsigned int color)
 {
+	if (x0 < 0 && x1 < 0) return;
+	if (y0 < 0 && y1 < 0) return;
+	if (x0 > 1023 && x1 > 1023) return;
+	if (y0 > 1023 && y1 > 1023) return;
+
 	double nx = y0 - y1;
 	double ny = x1 - x0;
 	double nd = (double)sqrt(nx * nx + ny * ny);
@@ -210,20 +251,13 @@ void drawarrow(double x0, double y0, double x1, double y1, double w, unsigned in
 	double ud = (double)sqrt(ux * ux + uy * uy);
 	ux /= ud;
 	uy /= ud;
-	drawline(x0, y0, x1 + ux * w * 0.5, y1 + uy * w * 0.5, w, color);
-	drawline(
-		x1,
-		y1,
-		x1 + (nx - ux) * w * 4,
-		y1 + (ny - uy) * w * 4,
-		w,
-		color);
-	drawline(
-		x1,
-		y1,
-		x1 + (-nx - ux) * w * 4,
-		y1 + (-ny - uy) * w * 4,
-		w,
+	drawline(x0, y0, x1 - ux * w * 3*4, y1 - uy * w * 3*4, w, color);
+	drawtri(
+		x1, y1,
+		x1 + (nx - ux * 3) * w * 4,
+		y1 + (ny - uy * 3) * w * 4,
+		x1 + (-nx - ux * 3) * w * 4,
+		y1 + (-ny - uy * 3) * w * 4,
 		color);
 }
 
@@ -247,20 +281,13 @@ void drawarrow(double start, double end, double x0, double y0, double x1, double
 	x1 -= ux * end;
 	y1 -= uy * end;
 	
-	drawline(x0, y0, x1 + ux * w * 0.5, y1 + uy * w * 0.5, w, color);
-	drawline(
-		x1,
-		y1,
-		x1 + (nx - ux) * w * 4,
-		y1 + (ny - uy) * w * 4,
-		w,
-		color);
-	drawline(
-		x1,
-		y1,
-		x1 + (-nx - ux) * w * 4,
-		y1 + (-ny - uy) * w * 4,
-		w,
+	drawline(x0, y0, x1 - ux * w * 2, y1 - uy * w * 2, w, color);
+	drawtri(
+		x1, y1,
+		x1 + (nx - ux * 3) * w * 4,
+		y1 + (ny - uy * 3) * w * 4,
+		x1 + (-nx - ux * 3) * w * 4,
+		y1 + (-ny - uy * 3) * w * 4,
 		color);
 }
 
@@ -279,6 +306,182 @@ void drawcircle(double x0, double y0, double r, unsigned int color)
 		py1 = y1;
 	}
 }
+
+void drawpie(double x0, double y0, double r, double v0, double v1, double dragout, unsigned int color)
+{
+	double px1 = x0;
+	double py1 = y0 + r;
+	double ofs = 2 * 3.141592653589 * v0;
+	double range = v1 - v0;
+	double nx = (double)sin(ofs + (range * 0.5) * 2 * 3.141592653589);
+	double ny = (double)cos(ofs + (range * 0.5) * 2 * 3.141592653589);
+	x0 += nx * dragout;
+	y0 += ny * dragout;
+	int iters = (int)(r * 0.5 * range);
+	if (iters < 16) iters = 16;
+	for (int i = 0; i < iters + 1; i++)
+	{
+		double x1 = x0 + (double)sin(ofs + range * 2 * 3.141592653589 * ((i) / (double)iters)) * r;
+		double y1 = y0 + (double)cos(ofs + range * 2 * 3.141592653589 * ((i) / (double)iters)) * r;
+		if (i)
+			drawtri(
+				x0, 
+				y0, 
+				px1 + nx * dragout,
+				py1 + ny * dragout,
+				x1 + nx * dragout,
+				y1 + ny * dragout,
+				color);
+		px1 = x1;
+		py1 = y1;
+	}
+}
+
+
+void drawsquicle(double x0, double y0, double r, double d, unsigned int color)
+{
+	double px1 = x0;
+	double py1 = y0 + r;
+	int iters = (int)r / 2;
+	if (iters < 16) iters = 16;
+	for (int i = 0; i < iters + 1; i++)
+	{
+		double x1c = (double)sin(3.141592653589 * 2 * ((i + 1) / (double)iters));
+		double y1c = (double)cos(3.141592653589 * 2 * ((i + 1) / (double)iters));
+		double x1s = 0;
+		double y1s = 0;
+		if (abs(x1c) > abs(y1c))
+		{
+			// x major
+			// y = r / x
+			double scale = abs(1.0 / x1c);
+			x1s = x1c * scale;
+			y1s = y1c * scale;
+		}
+		else
+		{
+			// y major
+			// x = r / y
+			double scale = abs(1.0 / y1c);
+			x1s = x1c * scale;
+			y1s = y1c * scale;
+		}
+		double x1 = x0 + (x1c + (x1s - x1c) * d) * r;
+		double y1 = y0 + (y1c + (y1s - y1c) * d) * r;
+		drawtri(x0, y0, px1, py1, x1, y1, color);
+		px1 = x1;
+		py1 = y1;
+	}
+}
+
+void graphbar(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval)
+{
+	double w = x1 - x0;
+	double h = y1 - y0;
+	double cw = w / count;
+	if (maxval < 0.001)
+	{
+		minval = 100000000;
+		for (int i = 0; i < count; i++)
+		{
+			if (data[i] > maxval)
+				maxval = data[i];
+			if (data[i] < minval)
+				minval = data[i];
+		}
+	}
+	double range = maxval - minval;
+
+	for (int i = 0; i < count; i++)
+		drawrect(
+			x0 + cw * i + cw / 2, 
+			y0 + h * (1 - ((data[i] - minval) / range)), 
+			x0 + cw * i + cw, 
+			y1, 
+			rainbow(i / (double)count));
+}
+
+void graphline(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval)
+{
+	double w = x1 - x0;
+	double h = y1 - y0;
+	double cw = w / count;
+	if (maxval < 0.001)
+	{
+		minval = 100000000;
+		for (int i = 0; i < count; i++)
+		{
+			if (data[i] > maxval)
+				maxval = data[i];
+			if (data[i] < minval)
+				minval = data[i];
+		}
+	}
+	double range = maxval - minval;
+
+	double px = 0, py = 0;
+	for (int i = 0; i < count; i++)
+	{
+		if (i)
+		drawline(
+			x0 + cw * i + cw / 2,
+			y0 + h * (1 - ((data[i] - minval) / range)),
+			px,
+			py,
+			4,
+			rainbow(i / (double)count));
+		px = x0 + cw * i + cw / 2;
+		py = y0 + h * (1 - ((data[i] - minval) / range));
+	}
+}
+
+void graphpie(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval)
+{
+	double x = (x0 + x1) / 2;
+	double y = (y0 + y1) / 2;
+	double w = x1 - x0;
+	double h = y1 - y0;
+	double r = ((w > h) ? h : w) / 2 - maxval - minval * count;
+	double total = 0;
+	for (int i = 0; i < count; i++)
+		total += data[i];
+
+	double ofs = 0;
+	for (int i = 0; i < count; i++)
+	{
+		drawpie(x, y, r - maxval, ofs, ofs + data[i] / total, maxval, rainbow(i / (double)count));
+		ofs += data[i] / total;
+		maxval += minval;
+	}
+}
+
+void graphdot(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval)
+{
+	double w = x1 - x0;
+	double h = y1 - y0;
+	double cw = w / count;
+	if (maxval < 0.001)
+	{
+		minval = 100000000;
+		for (int i = 0; i < count; i++)
+		{
+			if (data[i] > maxval)
+				maxval = data[i];
+			if (data[i] < minval)
+				minval = data[i];
+		}
+	}
+	double range = maxval - minval;
+
+	for (int i = 0; i < count; i++)
+		drawcircle(
+			x0 + cw * i + cw / 2,
+			y0 + h * (1 - ((data[i] - minval) / range)),
+			cw / 3,
+			rainbow(i / (double)count));
+}
+
+
 
 unsigned char TFX_AsciiFontdata[12 * 256] = {
   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,// ' '
@@ -393,7 +596,7 @@ void drawchar(int aChar, int aX, int aY, int aColor)
 		{
 			if (ispixel(aChar, j, i))
 			{
-				framebuffer[(aY + i) * 1024 + aX + j] = aColor;
+				blendwrite((aY + i) * 1024 + aX + j, aColor);
 			}
 		}
 	}
@@ -427,11 +630,13 @@ void drawchar(int aChar, int aX, int aY, int n, int aColor)
 	int i, j;
 	for (i = 0; i < 12*n; i++)
 	{
+		if ((aY + i) > 0 && (aY + i) < 1024)
 		for (j = 0; j < 8*n; j++)
 		{
+			if ((aX + j) > 0 && (aX + j) < 1024)
 			if (ispixel(aChar, j/n, i/n))
 			{
-				framebuffer[(aY + i) * 1024 + aX + j] = aColor;
+				blendwrite((aY + i) * 1024 + aX + j, aColor);
 			}
 		}
 	}
@@ -489,4 +694,157 @@ char* load(const char* fname, int* len)
 	}
 	fclose(f);
 	return d;
+}
+
+void hsv2rgb(double h, double s, double v, double&r, double&g, double&b)
+{
+	double S, H, V, F, M, N, K;
+	int   I;
+
+	S = s;  
+	H = h;  
+	V = v;  
+
+	if (S == 0.0) 
+	{
+		//Achromatic case, set level of grey
+		r = V;
+		g = V;
+		b = V;
+	}
+	else 
+	{
+		// Determine levels of primary colours.
+		if (H >= 1.0) 
+		{
+			H = 0.0;
+		}
+		else 
+		{
+			H = H * 6;
+		} 
+		I = (int)H;   // should be in the range 0..5 
+		F = H - I;    // fractional part
+
+		M = V * (1 - S);
+		N = V * (1 - S * F);
+		K = V * (1 - S * (1 - F));
+
+		if (I == 0) { r = V; g = K; b = M; }
+		if (I == 1) { r = N; g = V; b = M; }
+		if (I == 2) { r = M; g = V; b = K; }
+		if (I == 3) { r = M; g = N; b = V; }
+		if (I == 4) { r = K; g = M; b = V; }
+		if (I == 5) { r = V; g = M; b = N; }
+	}
+}
+
+int rainbow(double pos)
+{
+	pos = (double)fmod(pos, 1);
+	double red, green, blue;
+	hsv2rgb(pos, 0.8f, 0.8f, red, green, blue);
+
+	return ((int)(red * 0xff) << 0) | ((int)(green * 0xff) << 8) | ((int)(blue * 0xff) << 16);
+}
+
+int rainbow_hilight(double pos)
+{
+	pos = (double)fmod(pos, 1);
+	double red, green, blue;
+	hsv2rgb(pos, 0.6f, 1.0f, red, green, blue);
+
+	return ((int)(red * 0xff) << 0) | ((int)(green * 0xff) << 8) | ((int)(blue * 0xff) << 16);
+}
+
+int rainbow_shadow(double pos)
+{
+	pos = (double)fmod(pos, 1);
+	double red, green, blue;
+	hsv2rgb(pos, 0.8f, 0.6f, red, green, blue);
+
+	return ((int)(red * 0xff) << 0) | ((int)(green * 0xff) << 8) | ((int)(blue * 0xff) << 16);
+}
+
+double catmullrom(double t, double p0, double p1, double p2, double p3)
+{
+	return 0.5 * (
+		(2 * p1) +
+		(-p0 + p2) * t +
+		(2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t +
+		(-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t
+		);
+}
+
+static const int  SEED = 1985;
+
+static const unsigned char  HASH[] = {
+	208,34,231,213,32,248,233,56,161,78,24,140,71,48,140,254,245,255,247,247,40,
+	185,248,251,245,28,124,204,204,76,36,1,107,28,234,163,202,224,245,128,167,204,
+	9,92,217,54,239,174,173,102,193,189,190,121,100,108,167,44,43,77,180,204,8,81,
+	70,223,11,38,24,254,210,210,177,32,81,195,243,125,8,169,112,32,97,53,195,13,
+	203,9,47,104,125,117,114,124,165,203,181,235,193,206,70,180,174,0,167,181,41,
+	164,30,116,127,198,245,146,87,224,149,206,57,4,192,210,65,210,129,240,178,105,
+	228,108,245,148,140,40,35,195,38,58,65,207,215,253,65,85,208,76,62,3,237,55,89,
+	232,50,217,64,244,157,199,121,252,90,17,212,203,149,152,140,187,234,177,73,174,
+	193,100,192,143,97,53,145,135,19,103,13,90,135,151,199,91,239,247,33,39,145,
+	101,120,99,3,186,86,99,41,237,203,111,79,220,135,158,42,30,154,120,67,87,167,
+	135,176,183,191,253,115,184,21,233,58,129,233,142,39,128,211,118,137,139,255,
+	114,20,218,113,154,27,127,246,250,1,8,198,250,209,92,222,173,21,88,102,219
+};
+
+static int noise2(int x, int y)
+{
+	int  yindex = (y + SEED) % 256;
+	if (yindex < 0)
+		yindex += 256;
+	int  xindex = (HASH[yindex] + x) % 256;
+	if (xindex < 0)
+		xindex += 256;
+	const int  result = HASH[xindex];
+	return result;
+}
+
+static double lin_inter(double x, double y, double s)
+{
+	return x + s * (y - x);
+}
+
+static double smooth_inter(double x, double y, double s)
+{
+	return lin_inter(x, y, s * s * (3 - 2 * s));
+}
+
+static double noise2d(double x, double y)
+{
+	const int  x_int = (int)floor(x);
+	const int  y_int = (int)floor(y);
+	const double  x_frac = x - x_int;
+	const double  y_frac = y - y_int;
+	const int  s = noise2(x_int, y_int);
+	const int  t = noise2(x_int + 1, y_int);
+	const int  u = noise2(x_int, y_int + 1);
+	const int  v = noise2(x_int + 1, y_int + 1);
+	const double  low = smooth_inter(s, t, x_frac);
+	const double  high = smooth_inter(u, v, x_frac);
+	const double  result = smooth_inter(low, high, y_frac);
+	return result;
+}
+
+double perlin2d(double x, double y, double freq, int depth)
+{
+	double  xa = x * freq;
+	double  ya = y * freq;
+	double  amp = 1.0;
+	double  fin = 0;
+	double  div = 0.0;
+	for (int i = 0; i < depth; i++)
+	{
+		div += 256 * amp;
+		fin += noise2d(xa, ya) * amp;
+		amp /= 2;
+		xa *= 2;
+		ya *= 2;
+	}
+	return fin / div;
 }
