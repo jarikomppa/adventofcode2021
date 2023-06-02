@@ -90,8 +90,10 @@ void nextframe(int ofs, int commit)
 	GifWriteFrame(&gifwriter, (const unsigned char*)frame, 512, 512, 3);
 }
 
-void endgif()
+void endgif(int endframes)
 {
+	for (int i = 0; i < endframes; i++)
+		nextframe();
 	GifEnd(&gifwriter);
 }
 
@@ -115,7 +117,9 @@ void drawrect(double x0, double y0, double x1, double y1, unsigned int color)
 
 void drawspan(int x0, int y0, int x1, unsigned int color)
 {
+	if (y0 < 0 || y0 > 1023) return;
 	if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
+	if (x0 > 1023 || x1 < 0) return;
 	x1++;
 	if (x0 < 0) x0 = 0;
 	if (x1 > 1023) x1 = 1023;
@@ -289,6 +293,16 @@ void drawarrow(double start, double end, double x0, double y0, double x1, double
 		x1 + (-nx - ux * 3) * w * 4,
 		y1 + (-ny - uy * 3) * w * 4,
 		color);
+}
+
+void drawmanhattan(double x0, double y0, double d, unsigned int color)
+{
+	for (int i = 0; i < d; i++)
+	{
+		drawspan(x0 - (d - i), y0 - i, x0 + (d - i), color);
+		if (i)
+			drawspan(x0 - (d - i), y0 + i, x0 + (d - i), color);
+	}
 }
 
 void drawcircle(double x0, double y0, double r, unsigned int color)
@@ -604,13 +618,24 @@ void drawchar(int aChar, int aX, int aY, int aColor)
 
 void drawstring(const char* aString, int aX, int aY, int aColor)
 {
+	int x = aX;
+	int y = aY;
 	if (aY + 8 > 1024) return;
 	while (*aString)
 	{
-		drawchar(*aString, aX, aY, aColor);
-		aX += 8;
-		if (aX + 8 > 1024)
-			return;
+		if (*aString == '\n')
+		{
+			y += 8;
+			x = aX;
+			if (y + 8 > 1024) return;
+		}
+		else
+		{
+			drawchar(*aString, x, y, aColor);
+			x += 8;
+			if (x + 8 > 1024)
+				return;
+		}
 		aString++;
 	}
 }
@@ -644,12 +669,24 @@ void drawchar(int aChar, int aX, int aY, int n, int aColor)
 
 void drawstring(const char* aString, int aX, int aY, int n, int aColor)
 {
+	int x = aX;
+	int y = aY;
+	if (y + 12 * n > 1024) return;
 	while (*aString)
 	{
-		drawchar(*aString, aX, aY, n, aColor);
-		aX += 8*n;
-		if (aX + 8*n > 1024)
-			return;
+		if (*aString == '\n')
+		{
+			x = aX;
+			y += 12 * n;
+			if (y + 12 * n > 1024) return;
+		}
+		else
+		{
+			drawchar(*aString, x, y, n, aColor);
+			x += 8 * n;
+			if (x + 8 * n > 1024)
+				return;
+		}
 		aString++;
 	}
 }
@@ -658,7 +695,7 @@ int isprime(long long val)
 {
 	if (val < 0) return 0;
 	if (!(val & 1)) return 0;
-	long long maxdiv = (long long)sqrt((double)val);
+	long long maxdiv = (long long)sqrt((double)val) + 1;
 	for (long long i = 3; i < maxdiv; i += 2)
 	{
 		if (!(val % i))
@@ -847,4 +884,57 @@ double perlin2d(double x, double y, double freq, int depth)
 		ya *= 2;
 	}
 	return fin / div;
+}
+
+void decfb()
+{
+	for (int i = 0; i < 1024 * 1024; i++)
+	{
+		if (framebuffer[i])
+		{
+			int r = (framebuffer[i] >> 0) & 0xff;
+			int g = (framebuffer[i] >> 8) & 0xff;
+			int b = (framebuffer[i] >> 16) & 0xff;
+			if (r) r--;
+			if (g) g--;
+			if (b) b--;
+			framebuffer[i] = (framebuffer[i] & 0xff000000) | (r << 0) | (g << 8) | (b << 16);
+		}
+	}
+}
+
+void loadgrid(const char* fn, char*& grid, int& gridx, int& gridy)
+{
+	grid = 0;
+	gridx = 0;
+	gridy = 0;
+
+	Tokenizer lines;
+	char* data = load(fn);
+
+	lines.init(data, "\r\n");
+	if (!data)
+	{
+		printf("File not found\n");
+		return;
+	}
+
+	for (int l = 0; l < lines.count(); l++)
+	{
+		if (lines.get(l)[0])
+		{
+			gridy++;
+			if (!gridx) gridx = (int)strlen(lines.get(l));
+		}
+	}
+	grid = new char[gridx * gridy];
+	gridy = 0;
+	for (int l = 0; l < lines.count(); l++)
+	{
+		if (lines.get(l)[0])
+		{
+			memcpy(grid + gridx * gridy, lines.get(l), gridx);
+			gridy++;
+		}
+	}
 }

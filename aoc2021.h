@@ -18,7 +18,7 @@ extern int do_blend;
 
 void setupgif(int motionblurframes, const char* fn);
 void nextframe(int ofs = 0, int commit = 1);
-void endgif();
+void endgif(int endframes = 0);
 void clear();
 void drawrect(int x0, int y0, int x1, int y1, unsigned int color);
 void drawbox(int x0, int y0, int w, int h, unsigned int color);
@@ -27,13 +27,16 @@ void drawline(double x0, double y0, double x1, double y1, double w, unsigned int
 void drawarrow(double x0, double y0, double x1, double y1, double w, unsigned int color);
 void drawarrow(double start, double end, double x0, double y0, double x1, double y1, double w, unsigned int color);
 void drawcircle(double x0, double y0, double r, unsigned int color);
+void drawmanhattan(double x0, double y0, double d, unsigned int color);
 void drawpie(double x0, double y0, double r, double v0, double v1, double dragout, unsigned int color);
 void drawsquicle(double x0, double y0, double r, double d, unsigned int color);
 void drawstring(const char* aString, int aX, int aY, int aColor);
 void drawstring(const char* aString, int aX, int aY, int n, int aColor);
 void drawstringf( int aX, int aY, int n, int aColor, const char* fmt, ...);
+void drawchar(int aChar, int aX, int aY, int n, int aColor);
 double catmullrom(double t, double p0, double p1, double p2, double p3);
 double perlin2d(double x, double y, double freq, int depth);
+void decfb();
 
 void graphbar(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval);
 void graphline(double x0, double y0, double x1, double y1, double* data, int count, double minval, double maxval);
@@ -44,29 +47,31 @@ long long getticks();
 
 int isprime(long long val);
 char* load(const char* fname, int* len = 0);
+void loadgrid(const char* fn, char*& grid, int& gridx, int& gridy);
 
-void d1();
-void d2();
-void d3();
-void d4();
-void d5();
-void d6();
-void d7();
-void d8();
-void d9();
-void d10();
-void d11();
-void d12();
-void d13();
-void d14();
-void d15();
-void d16();
-void d17();
-void d18();
-void d19();
-void d20();
-void d21();
-void d22();
-void d23();
-void d24();
-void d25();
+
+namespace day_1 { void d(); }
+namespace day_2 { void d(); }
+namespace day_3 { void d(); }
+namespace day_4 { void d(); }
+namespace day_5 { void d(); }
+namespace day_6 { void d(); }
+namespace day_7 { void d(); }
+namespace day_8 { void d(); }
+namespace day_9 { void d(); }
+namespace day_10 { void d(); }
+namespace day_11 { void d(); }
+namespace day_12 { void d(); }
+namespace day_13 { void d(); }
+namespace day_14 { void d(); }
+namespace day_15 { void d(); }
+namespace day_16 { void d(); }
+namespace day_17 { void d(); }
+namespace day_18 { void d(); }
+namespace day_19 { void d(); }
+namespace day_20 { void d(); }
+namespace day_21 { void d(); }
+namespace day_22 { void d(); }
+namespace day_23 { void d(); }
+namespace day_24 { void d(); }
+namespace day_25 { void d(); }
